@@ -1,0 +1,55 @@
+{
+  "name": "creamcli",
+  "version": "0.18.0",
+  "description": "Terminal AI assistant for local and cloud LLMs, with tools, skills, MCP and remote control.",
+  "type": "module",
+  "bin": {
+    "cream": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.tsx",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "keywords": [
+    "cli",
+    "terminal",
+    "ai",
+    "llm",
+    "agent",
+    "ollama",
+    "openrouter",
+    "deepseek",
+    "mcp",
+    "ink"
+  ],
+  "author": "ziaul",
+  "license": "MIT",
+  "dependencies": {
+    "ink": "^8.0.0",
+    "ink-big-text": "^2.0.0",
+    "ink-gradient": "^4.0.1",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.3.1",
+    "string-width": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
