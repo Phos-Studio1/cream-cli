@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import React from 'react';
 import { render } from 'ink';
 import { App } from './app.js';
@@ -10,7 +11,7 @@ import { listSessions, loadSession, sessionsDir, type Session } from './lib/sess
 import { mcp } from './lib/mcp.js';
 import { disableMouse, renders } from './lib/terminal.js';
 
-const version = '0.18.0';
+const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
 
 const usage = `
   Cream v${version} - Smooth as cream, made by ziaul

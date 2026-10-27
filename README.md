@@ -1,5 +1,7 @@
 # Cream
 
+[![npm](https://img.shields.io/npm/v/creamcli)](https://www.npmjs.com/package/creamcli) [![CI](https://github.com/Phos-Studio1/cream-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Phos-Studio1/cream-cli/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Terminal AI assistant for local and cloud LLMs. Cream chats, edits files, runs commands with your approval, uses skills and MCP tools, remembers context across sessions, and can be controlled from your phone.
 
 > **Status:** beta. Expect breaking changes before 1.0. Primarily tested on Windows; macOS and Linux are supported but less tested.
@@ -22,14 +24,20 @@ Terminal AI assistant for local and cloud LLMs. Cream chats, edits files, runs c
 ## Installation
 
 ```bash
-git clone https://github.com/Phos-Studio1/cream-cli.git cream
-cd cream
+npm install -g creamcli
+```
+
+Then start it with `cream`. Update with the same command.
+
+To run from source instead:
+
+```bash
+git clone https://github.com/Phos-Studio1/cream-cli.git
+cd cream-cli
 npm install
 npm run build
 npm link
 ```
-
-Then start it with `cream`.
 
 ## Quick start
 
