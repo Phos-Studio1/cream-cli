@@ -22,7 +22,7 @@ Terminal AI assistant for local and cloud LLMs. Cream chats, edits files, runs c
 ## Installation
 
 ```bash
-git clone <repository-url> cream
+git clone https://github.com/Phos-Studio1/cream-cli.git cream
 cd cream
 npm install
 npm run build

@@ -36,6 +36,14 @@
   ],
   "author": "ziaul",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phos-Studio1/cream-cli.git"
+  },
+  "homepage": "https://github.com/Phos-Studio1/cream-cli#readme",
+  "bugs": {
+    "url": "https://github.com/Phos-Studio1/cream-cli/issues"
+  },
   "dependencies": {
     "ink": "^8.0.0",
     "ink-big-text": "^2.0.0",
