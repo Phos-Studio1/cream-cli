@@ -3,13 +3,15 @@ import fs from 'node:fs';
 import React from 'react';
 import { render } from 'ink';
 import { App } from './app.js';
+import { askFolderTrust } from './components/TrustPrompt.js';
 import { brainDir } from './lib/brain.js';
-import { configPath, loadConfig } from './lib/config.js';
+import { configPath, loadConfig, saveConfig } from './lib/config.js';
 import { migrateLegacyData } from './lib/paths.js';
 import { getProvider, providerIds } from './lib/providers.js';
 import { listSessions, loadSession, sessionsDir, type Session } from './lib/sessions.js';
 import { mcp } from './lib/mcp.js';
 import { disableMouse, renders } from './lib/terminal.js';
+import { folderKey, folderTrust } from './lib/trust.js';
 
 const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
 
@@ -109,6 +111,15 @@ else if (args.continue) {
 }
 
 if (!process.stdin.isTTY) fail('Cream needs an interactive terminal.');
+
+if (!folderTrust(config.folders)) {
+  const choice = await askFolderTrust(process.cwd());
+  if (choice === 'exit') process.exit(0);
+  const stored = loadConfig();
+  stored.folders = { ...stored.folders, [folderKey(process.cwd())]: choice };
+  saveConfig(stored);
+  config.folders = stored.folders;
+}
 
 process.on('exit', () => {
   disableMouse();

@@ -21,7 +21,10 @@ export type Config = {
   remote: RemoteConfig;
   mascot: boolean;
   mcpServers: Record<string, McpServerConfig>;
+  folders: Record<string, FolderTrust>;
 };
+
+export type FolderTrust = 'trust' | 'ask';
 
 export type RemoteBot = { token: string; allowed: string[] };
 
@@ -58,6 +61,7 @@ export const defaultConfig: Config = {
   remote: { enabled: true, telegram: { token: '', allowed: [] }, discord: { token: '', allowed: [] } },
   mascot: true,
   mcpServers: {},
+  folders: {},
 };
 
 const freshRemote = (raw?: Partial<RemoteConfig>): RemoteConfig => ({
@@ -94,6 +98,7 @@ function migrate(raw: Record<string, any>): Config {
     apiKeys: { ...raw.apiKeys },
     remote: freshRemote(raw.remote),
     mcpServers: { ...raw.mcpServers },
+    folders: Object.fromEntries(Object.entries(raw.folders ?? {}).filter(([, value]) => value === 'trust' || value === 'ask')) as Record<string, FolderTrust>,
   };
   if (legacyPrompts.includes(raw.systemPrompt)) config.systemPrompt = defaultConfig.systemPrompt;
   if (!raw.provider && typeof raw.baseUrl === 'string') {

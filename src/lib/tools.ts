@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { addMemory, removeMemory } from './brain.js';
 import { mcp } from './mcp.js';
+import { parseQuestions, type Question } from './questions.js';
 import { searchSessions } from './sessions.js';
 import { readSkill, type Skill } from './skills.js';
 
@@ -23,6 +24,7 @@ export type ToolContext = {
   signal: AbortSignal;
   sessionId?: string;
   screenshot?: (args: Record<string, any>) => Promise<ToolOutcome>;
+  ask?: (questions: Question[]) => Promise<ToolOutcome>;
 };
 
 export type ToolOutcome = { ok: boolean; output: string };
@@ -113,6 +115,38 @@ export function toolDefinitions(skills: Skill[]): ToolDefinition[] {
     {
       type: 'function',
       function: {
+        name: 'ask_user',
+        description:
+          'Ask the user one to four questions at once and wait for their answers. Each question is shown as a menu of options; the user can always type their own answer, so never add an "Other" option. Use it whenever you need decisions or preferences before continuing, and put every question you have in a single call instead of asking in your reply.',
+        parameters: object(
+          {
+            questions: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 4,
+              items: object(
+                {
+                  question: { type: 'string', description: 'The full question, ending with a question mark' },
+                  header: { type: 'string', description: 'Very short label, at most 16 characters' },
+                  options: {
+                    type: 'array',
+                    minItems: 2,
+                    maxItems: 6,
+                    items: object({ label: { type: 'string' }, description: { type: 'string' } }, ['label']),
+                  },
+                  multi_select: { type: 'boolean', description: 'Allow choosing several options' },
+                },
+                ['question', 'options'],
+              ),
+            },
+          },
+          ['questions'],
+        ),
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'remember',
         description:
           'Save a durable fact about the user to long-term memory shared across all chats (name, projects, preferences, setup, goals). Write one short standalone sentence. Never store secrets such as API keys or passwords.',
@@ -187,6 +221,7 @@ export function describeCall(call: ParsedCall): string {
   if (name === 'remember') return String(args.text ?? '');
   if (name === 'forget') return `#${args.id ?? '?'}`;
   if (name === 'search_chats') return String(args.query ?? '');
+  if (name === 'ask_user') return (Array.isArray(args.questions) ? args.questions : []).map((q: { header?: string; question?: string }) => q?.header || q?.question).join(' · ');
   if (name.startsWith('mcp__')) return JSON.stringify(args).slice(0, 160);
   if (name === 'screenshot') return `${args.screen === 'primary' ? 'primary monitor' : 'all monitors'}${args.look ? ' · model looks' : ''}${args.send_to_phone ? ' · send to phone' : ''}`;
   if (name === 'mcp_find_tools') return `${args.server ? `${args.server}: ` : ''}${args.query ?? ''}`;
@@ -302,6 +337,11 @@ export async function executeTool(call: ParsedCall, ctx: ToolContext): Promise<T
       }
       case 'search_chats':
         return { ok: true, output: truncate(searchSessions(String(args.query ?? ''), ctx.sessionId)) };
+      case 'ask_user': {
+        const questions = parseQuestions(args.questions);
+        if (typeof questions === 'string') return { ok: false, output: questions };
+        return ctx.ask ? await ctx.ask(questions) : { ok: false, output: 'Menus are not available here. Ask the questions in your reply instead.' };
+      }
       case 'screenshot':
         return ctx.screenshot ? await ctx.screenshot(args) : { ok: false, output: 'Screenshot is not available here.' };
       case 'mcp_find_tools':

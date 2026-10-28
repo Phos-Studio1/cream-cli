@@ -11,10 +11,20 @@ export const configPath = path.join(dataRoot, 'config.json');
 
 export type MigrationPaths = { root: string; legacyConfigDir: string; legacyInstallDir: string };
 
+function installDir(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (!fs.existsSync(path.join(dir, 'package.json'))) {
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return dir;
+}
+
 const defaultMigration: MigrationPaths = {
   root: dataRoot,
   legacyConfigDir: path.join(os.homedir(), '.creamcli'),
-  legacyInstallDir: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
+  legacyInstallDir: installDir(),
 };
 
 function copyIfMissing(source: string, target: string): boolean {

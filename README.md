@@ -9,7 +9,8 @@ Terminal AI assistant for local and cloud LLMs. Cream chats, edits files, runs c
 ## Features
 
 - **Any OpenAI-compatible provider:** Ollama, LM Studio, llama.cpp, OpenAI, OpenRouter, DeepSeek, Kimi, 9Router, or a custom endpoint.
-- **Agent tools:** read, write and edit files, run shell commands, take screenshots. Every side effect requires approval.
+- **Agent tools:** read, write and edit files, run shell commands, take screenshots. Side effects require approval unless you trust the folder.
+- **Question menus:** the model asks all of its questions at once as menus; you answer them and submit once.
 - **Skills:** install [Agent Skills](https://agentskills.io) from any GitHub repository.
 - **MCP:** connect stdio MCP servers. Large servers switch to tool search automatically.
 - **Memory:** saved chat history with resume, and long-term memory shared across chats.
@@ -81,6 +82,7 @@ If 9Router is installed (`npm install -g 9router`) but not running, Cream starts
 | `/url <url>` | Use a custom OpenAI-compatible endpoint |
 | `/tools` | Toggle tools |
 | `/approve` | Toggle auto-approve |
+| `/trust` | Change whether this folder is trusted |
 | `/skills [install\|remove] [owner/repo] [name\|all]` | Manage skills |
 | `/skill <name>` | Pin a skill so it is always active |
 | `/mcp [add\|remove\|on\|off\|restart\|tools]` | Manage MCP servers |
@@ -97,9 +99,19 @@ If 9Router is installed (`npm install -g 9router`) but not running, Cream starts
 
 ## Tools and approvals
 
-With tools enabled, the model can call `read_file`, `list_dir`, `write_file`, `edit_file`, `run_command`, `screenshot`, `use_skill`, `remember`, `forget` and `search_chats`. Paths and commands are relative to the folder where `cream` was started.
+With tools enabled, the model can call `read_file`, `list_dir`, `write_file`, `edit_file`, `run_command`, `screenshot`, `ask_user`, `use_skill`, `remember`, `forget` and `search_chats`. Paths and commands are relative to the folder where `cream` was started.
 
-File writes, edits, commands and screenshots ask for approval: `y` allow once, `a` always allow that tool for the session, `n` deny, `Esc` stop. `/approve` disables prompts; use it only in folders you trust.
+The first time Cream starts in a folder, it asks whether you trust it:
+
+1. **Yes, I trust this folder**: file changes and commands run without asking.
+2. **Ask me for every permission**: each action needs approval.
+3. **No, exit**.
+
+The choice is saved and applies to subfolders. Change it with `/trust`. Screenshots always ask, even in trusted folders.
+
+Approval prompts accept `y` allow once, `a` always allow that tool for the session, `n` deny and `Esc` stop. `/approve` turns prompts off everywhere; use it with care.
+
+When the model needs decisions, it calls `ask_user` with up to four questions. Each appears as a menu: `↑/↓` or a number to choose, `Space` to toggle in multi-select questions, `←/→` to switch questions, and a final **Submit** tab to send every answer at once. Every question also accepts a typed answer.
 
 ## Skills
 
@@ -148,7 +160,7 @@ Set `CREAM_HOME` to use another location. Data from older versions (`~/.creamcli
 
 ## Security
 
-- **Approvals are the main safeguard.** Read every command and file change before approving. Avoid `/approve` outside trusted folders.
+- **Approvals are the main safeguard.** Read every command and file change before approving. Trust only folders whose contents you know, since files can contain instructions that steer the model. Avoid `/approve` outside trusted folders.
 - **Secrets are stored in plain text** in `~/.cream/config.json`. Prefer environment variables on shared machines.
 - **Remote control executes on your computer.** Only paired accounts are accepted, codes rotate after each pairing, five wrong codes block an account until restart, and messages sent while Cream was closed are ignored. Use `/remote unpair` if a device is lost.
 - **Screenshots capture the entire screen.** Close sensitive windows first.
@@ -163,8 +175,10 @@ Report vulnerabilities privately to the maintainer instead of opening a public i
 npm run dev        # run from source
 npm test           # Vitest suite
 npm run typecheck  # TypeScript
-npm run build      # compile to dist/
+npm run build      # bundle to dist/cli.js with esbuild
 ```
+
+The published package is a single bundled file with no runtime dependencies. Licenses of bundled packages are collected in `dist/THIRD-PARTY-LICENSES.txt`.
 
 CI runs typecheck, tests and build on Windows, macOS and Linux with Node 22 and 24.
 

@@ -1,17 +1,31 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
-import BigText from 'ink-big-text';
 import { theme } from '../lib/theme.js';
 
 type Props = { columns: number; version: string };
+
+const block = [
+  ' ██████╗██████╗ ███████╗ █████╗ ███╗   ███╗',
+  '██╔════╝██╔══██╗██╔════╝██╔══██╗████╗ ████║',
+  '██║     ██████╔╝█████╗  ███████║██╔████╔██║',
+  '██║     ██╔══██╗██╔══╝  ██╔══██║██║╚██╔╝██║',
+  '╚██████╗██║  ██║███████╗██║  ██║██║ ╚═╝ ██║',
+  ' ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝',
+].join('\n');
+
+const chrome = [
+  '╔═╗╦═╗╔═╗╔═╗╔╦╗',
+  '║  ╠╦╝║╣ ╠═╣║║║',
+  '╚═╝╩╚═╚═╝╩ ╩╩ ╩',
+].join('\n');
 
 export function Banner({ columns, version }: Props) {
   return (
     <Box flexDirection="column" marginBottom={1}>
       {columns >= 50 ? (
         <Gradient colors={[...theme.gradient]}>
-          <BigText text="Cream" font={columns >= 80 ? 'block' : 'chrome'} letterSpacing={0} space={false} />
+          <Text>{columns >= 80 ? block : chrome}</Text>
         </Gradient>
       ) : (
         <Gradient colors={[...theme.gradient]}>

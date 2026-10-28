@@ -33,16 +33,26 @@ function pose(mood: Mood | 'sleep', tick: number): Pose {
 }
 
 export function Mascot({ mood, activityAt }: { mood: Mood; activityAt: number }) {
-  const [tick, setTick] = useState(0);
-  const sleeping = mood === 'idle' && Date.now() - activityAt > sleepAfterMs;
+  const current = (): Mood | 'sleep' => (mood === 'idle' && Date.now() - activityAt > sleepAfterMs ? 'sleep' : mood);
+  const [shown, setShown] = useState(() => pose(current(), 0));
   const fast = mood === 'talking' || mood === 'working' || mood === 'happy';
 
   useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), fast ? 220 : 420);
+    let tick = 0;
+    let last = '';
+    const update = () => {
+      const next = pose(current(), tick++);
+      const key = `${next.face}|${next.extra}|${next.offset}|${next.extraColor}`;
+      if (key === last) return;
+      last = key;
+      setShown(next);
+    };
+    update();
+    const timer = setInterval(update, fast ? 220 : 420);
     return () => clearInterval(timer);
-  }, [fast]);
+  }, [mood, activityAt, fast]);
 
-  const { face, extra, offset, extraColor } = pose(sleeping ? 'sleep' : mood, tick);
+  const { face, extra, offset, extraColor } = shown;
   const pad = ' '.repeat(offset);
 
   return (

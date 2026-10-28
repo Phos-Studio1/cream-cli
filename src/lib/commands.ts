@@ -11,6 +11,7 @@ export const commands: Command[] = [
   { name: '/mcp', args: '[add <name> <command…>|remove|on|off|restart|tools <name>]', description: 'Manage MCP servers (external tools such as REA)' },
   { name: '/tools', description: 'Toggle tools (files, commands, skills)' },
   { name: '/approve', description: 'Toggle auto-approve for file writes and commands' },
+  { name: '/trust', description: 'Change whether this folder is trusted' },
   { name: '/system', args: '[prompt]', description: 'Show or set the system prompt' },
   { name: '/temp', args: '<0-2>', description: 'Set the temperature' },
   { name: '/think', description: 'Show or hide model reasoning' },

@@ -2,6 +2,8 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { Box, Text, useApp, useInput, useWindowSize } from 'ink';
 import { ApprovalPrompt, type ApprovalRequest, type Decision } from './components/ApprovalPrompt.js';
 import { Banner } from './components/Banner.js';
+import { QuestionPrompt } from './components/QuestionPrompt.js';
+import { TrustPrompt } from './components/TrustPrompt.js';
 import {
   AssistantMessage,
   BrainPanel,
@@ -65,6 +67,8 @@ import {
   prepareContext,
 } from './lib/context.js';
 import { launchProvider } from './lib/launcher.js';
+import { formatAnswers, type Answers, type Question } from './lib/questions.js';
+import { autoApproves, folderKey, folderTrust } from './lib/trust.js';
 import { directToolLimit, mcp, type McpState } from './lib/mcp.js';
 import {
   deleteAllSessions,
@@ -120,11 +124,13 @@ type EntryInput = Entry extends infer E ? (E extends Entry ? Omit<E, 'id'> : nev
 
 type Live = StreamState & { startedAt: number; activity?: string };
 
-type Overlay = 'model' | 'provider' | 'key' | 'resume' | 'delete' | null;
+type Overlay = 'model' | 'provider' | 'key' | 'resume' | 'delete' | 'trust' | null;
 
 const savedKinds = new Set<Entry['kind']>(['user', 'assistant', 'tool']);
 
 type Pending = { request: ApprovalRequest; resolve: (decision: Decision) => void };
+
+type Asking = { questions: Question[]; resolve: (answers: Answers | null) => void };
 
 type Props = { initialConfig: Config; initialPrompt?: string; resume?: Session | 'pick'; version: string; migrated?: string[] };
 
@@ -222,7 +228,7 @@ const toolMapping = [
   '- Read, Write, Edit -> read_file, write_file, edit_file; Bash or shell -> run_command; Glob or Grep -> list_dir or run_command',
   '- TodoWrite or task lists -> keep a Markdown checklist in your reply or a TODO.md file',
   '- Subagents, Task tool, parallel agents -> not available; do the work yourself step by step (prefer executing-plans over subagent-driven-development)',
-  '- Plan mode or AskUserQuestion -> ask the user directly in your reply and wait for the answer',
+  '- AskUserQuestion -> ask_user; plan mode -> present the plan in your reply and wait for approval',
 ].join('\n');
 
 function summarize(description: string): string {
@@ -255,6 +261,7 @@ function buildSystemPrompt(config: Config, skills: Skill[], pinned: string[], me
         `You are running inside Cream on ${process.platform} with tools. Working directory: ${process.cwd()}`,
         `run_command uses ${shellName}${process.platform === 'win32' ? ', so use Windows command syntax' : ''}.`,
         'Only use tools when the task needs files or commands; otherwise answer directly. Save generated files in the working directory unless told otherwise.',
+        'When you need decisions or preferences from the user, call ask_user with all of your questions at once instead of asking them in your reply.',
       ].join('\n'),
     );
     if (skills.length)
@@ -290,6 +297,7 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
   const [elapsed, setElapsed] = useState(0);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [asking, setAsking] = useState<Asking | null>(null);
   const [connection, setConnection] = useState<Connection>('checking');
   const [speed, setSpeed] = useState<number>();
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -545,7 +553,7 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       };
 
       const key = approvalKey(call);
-      if (needsApproval(call.name, call.args) && !config.autoApprove && !allowed.current.has(key)) {
+      if (needsApproval(call.name, call.args) && !autoApproves(config, call.name) && !allowed.current.has(key)) {
         const preview =
           call.name === 'write_file'
             ? String(call.args.content ?? '')
@@ -563,11 +571,35 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       }
 
       setLive((prev) => (prev ? { ...prev, activity: `${call.name} ${detail.split('\n')[0]}` } : prev));
+      let dismissed = false;
       const outcome = await executeTool(call, {
         cwd: process.cwd(),
         skills,
         signal,
         sessionId: session.current.id,
+        ask: async (questions) => {
+          if (originRef.current)
+            return {
+              ok: false,
+              output: 'The user is chatting from their phone, where menus cannot be shown. Ask these questions as a short numbered list in your reply instead.',
+            };
+          setLive((prev) => (prev ? { ...prev, activity: 'Waiting for your answers…' } : prev));
+          const answers = await new Promise<Answers | null>((resolve) => {
+            const cancel = () => resolve(null);
+            signal.addEventListener('abort', cancel, { once: true });
+            setAsking({
+              questions,
+              resolve: (value) => {
+                signal.removeEventListener('abort', cancel);
+                resolve(value);
+              },
+            });
+          });
+          setAsking(null);
+          if (answers) return { ok: true, output: formatAnswers(questions, answers) };
+          dismissed = true;
+          return { ok: false, output: 'The user dismissed the questions without answering. Stop and wait for their next message.' };
+        },
         screenshot: async (args) => {
           const shot = await captureScreen(args.screen === 'primary' ? 'primary' : 'all');
           const ref = saveImage(session.current.id, shot);
@@ -588,9 +620,9 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       });
       record(outcome.ok ? 'ok' : 'error', outcome);
       if (call.name === 'remember' || call.name === 'forget') setMemories(loadMemories());
-      return outcome;
+      return dismissed ? { ...outcome, stop: true } : outcome;
     },
-    [config.autoApprove, skills, push, askApproval, hub],
+    [config, skills, push, askApproval, hub],
   );
 
   const generate = useCallback(
@@ -1019,6 +1051,8 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
           return config.autoApprove
             ? notify('success', 'Auto-approve off · you will confirm file writes and commands')
             : notify('info', 'Auto-approve on · the model can write files and run commands without asking');
+        case '/trust':
+          return setOverlay('trust');
         case '/system':
           if (!arg) return notify('info', `System prompt: ${config.systemPrompt || '(empty)'}`);
           updateConfig({ systemPrompt: arg === 'none' ? '' : arg });
@@ -1195,7 +1229,7 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
         startFresh();
         return hub.send(target, '✨ Percakapan baru dimulai.');
       }
-      if (liveRef.current || pending || confirm) return hub.send(target, '⏳ Cream is still busy. Wait a moment or send /stop.');
+      if (liveRef.current || pending || asking || confirm) return hub.send(target, '⏳ Cream is still busy. Wait a moment or send /stop.');
       if (command.startsWith('/') && !resolveSkillCommand(command))
         return hub.send(target, 'That command is only available in the terminal. Send /help for the commands you can use from your phone.');
       if (!text.trim() && !images.length) return;
@@ -1291,7 +1325,7 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
     const page = Math.max(3, scrollMetrics.current.height - 2);
     mouse.clear();
     setActivityAt(Date.now());
-    if (key.escape && live) abortRef.current?.abort();
+    if (key.escape && live && !asking) abortRef.current?.abort();
     else if (key.pageUp) scrollBy(-page);
     else if (key.pageDown) scrollBy(page);
     else if (key.ctrl && key.upArrow) scrollBy(-1);
@@ -1307,12 +1341,12 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       .map(([platform]) => `⇄ ${platformLabel[platform as RemotePlatform]}`)),
     ...(mcp.tools().length ? [`MCP ${mcp.tools().length}`] : []),
     ...(pinned.length ? [`pinned: ${pinned.join(', ')}`] : []),
-    ...(config.autoApprove ? ['auto-approve'] : []),
+    ...(config.autoApprove ? ['auto-approve'] : folderTrust(config.folders) === 'trust' ? ['trusted'] : []),
     ...(config.showThinking ? ['thinking shown'] : []),
   ];
   const showCard = columns >= 72;
   const showMascot = config.mascot && columns >= 60;
-  const mood: Mood = pending
+  const mood: Mood = pending || asking
     ? 'waiting'
     : live?.activity
       ? 'working'
@@ -1324,6 +1358,7 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
   const cardWidth = Math.min(36, Math.floor(columns * 0.3));
 
   const renderBottom = () => {
+    if (asking) return <QuestionPrompt questions={asking.questions} onSubmit={asking.resolve} onCancel={() => asking.resolve(null)} />;
     if (pending) return <ApprovalPrompt request={pending.request} onDecision={pending.resolve} />;
     if (confirm)
       return (
@@ -1338,6 +1373,21 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
         />
       );
     switch (overlay) {
+      case 'trust':
+        return (
+          <TrustPrompt
+            folder={process.cwd()}
+            onChoose={(choice) => {
+              setOverlay(null);
+              if (choice === 'exit') return exit();
+              updateConfig((prev) => ({ folders: { ...prev.folders, [folderKey(process.cwd())]: choice } }));
+              notify(
+                'success',
+                choice === 'trust' ? 'Folder trusted · file changes and commands run without asking' : 'Cream will ask before every file change and command',
+              );
+            }}
+          />
+        );
       case 'delete':
         return (
           <SessionPicker
