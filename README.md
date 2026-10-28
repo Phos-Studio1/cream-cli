@@ -67,6 +67,8 @@ Inside Cream, run `/provider` to pick a provider and `/model` to pick a model. C
 
 Environment variables take precedence over keys saved with `/key`.
 
+If 9Router is installed (`npm install -g 9router`) but not running, Cream starts it in the background in tray mode, bound to `127.0.0.1`. It keeps running after Cream exits; quit it from the tray icon.
+
 9Router is a third-party gateway. Some of its providers reuse consumer subscriptions, which may violate those services' terms. Review them before use.
 
 ## Commands

@@ -11,6 +11,7 @@ export type Provider = {
   keyEnv?: string;
   keyUrl?: string;
   startHint?: string;
+  launch?: { command: string; args: string[]; install: string };
 };
 
 export const providers: Provider[] = [
@@ -40,6 +41,7 @@ export const providers: Provider[] = [
     keyEnv: 'NINEROUTER_API_KEY',
     keyUrl: 'http://localhost:20128/dashboard',
     startHint: 'Run `9router --host 127.0.0.1` in another terminal (install: `npm install -g 9router`).',
+    launch: { command: '9router', args: ['--tray', '--skip-update', '--no-browser', '--host', '127.0.0.1'], install: 'npm install -g 9router' },
   },
   {
     id: 'openai',

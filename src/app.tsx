@@ -64,6 +64,7 @@ import {
   localBudget,
   prepareContext,
 } from './lib/context.js';
+import { launchProvider } from './lib/launcher.js';
 import { directToolLimit, mcp, type McpState } from './lib/mcp.js';
 import {
   deleteAllSessions,
@@ -416,7 +417,11 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
   useEffect(() => {
     let cancelled = false;
     let warned = false;
+    let launchChecks = 0;
     let timer: NodeJS.Timeout | undefined;
+    const retry = (ms: number) => {
+      timer = setTimeout(check, ms);
+    };
 
     if (active.needsKey && !active.apiKey) {
       setConnection('locked');
@@ -453,10 +458,35 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
             setOverlay((current) => current ?? 'key');
             return notify('error', describeError(error, active, false));
           }
+          const { launch, label } = active.provider;
+          if (launch && !launchChecks && isUnreachableError(error)) {
+            launchChecks = 1;
+            warned = true;
+            setConnection('starting');
+            notify('info', `${label} is not running. Starting it in the background…`);
+            return launchProvider(active.provider).then(
+              () => {
+                if (!cancelled) retry(1000);
+              },
+              (launchError: Error) => {
+                if (cancelled) return;
+                setConnection('offline');
+                notify('error', `Could not start ${label} (${launchError.message}). Install it with \`${launch.install}\`, then Cream will connect automatically.`);
+                retry(5000);
+              },
+            );
+          }
+          if (launchChecks && launchChecks < 30) {
+            launchChecks++;
+            return retry(1000);
+          }
           setConnection('offline');
-          if (!warned) notify('error', `${describeError(error, active, false)} Retrying in the background…`);
+          if (launchChecks === 30) {
+            launchChecks++;
+            notify('error', `${label} did not respond within 30 seconds. ${describeError(error, active, false)} Retrying in the background…`);
+          } else if (!warned) notify('error', `${describeError(error, active, false)} Retrying in the background…`);
           warned = true;
-          timer = setTimeout(check, 5000);
+          retry(5000);
         });
     };
 

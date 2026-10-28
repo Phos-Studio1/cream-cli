@@ -2,10 +2,11 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../lib/theme.js';
 
-export type Connection = 'checking' | 'loading' | 'online' | 'offline' | 'locked';
+export type Connection = 'checking' | 'starting' | 'loading' | 'online' | 'offline' | 'locked';
 
 const dot: Record<Connection, { color: string; label: string }> = {
   checking: { color: theme.caramel, label: 'checking' },
+  starting: { color: theme.caramel, label: 'starting' },
   loading: { color: theme.caramel, label: 'loading model' },
   online: { color: theme.mint, label: 'online' },
   offline: { color: theme.strawberry, label: 'offline' },
