@@ -1,5 +1,8 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { launchProvider } from '../src/lib/launcher.js';
+import { findShimScript, launchProvider, shimScript } from '../src/lib/launcher.js';
 import { getProvider, type Provider } from '../src/lib/providers.js';
 
 const fake = (id: string, command: string, args: string[]): Provider =>
@@ -27,5 +30,24 @@ describe('launchProvider', () => {
       args: ['--tray', '--skip-update', '--no-browser', '--host', '127.0.0.1'],
       install: 'npm install -g 9router',
     });
+  });
+});
+
+describe('npm shims', () => {
+  const shim = String.raw`endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_modules\9router\cli.js" %*`;
+
+  it('extracts the script path from an npm cmd shim', () => {
+    expect(shimScript(shim, path.join('C:', 'npm'))).toBe(path.join('C:', 'npm', 'node_modules', '9router', 'cli.js'));
+    expect(shimScript('@echo off', 'x')).toBeUndefined();
+  });
+
+  it('finds the script behind a command on PATH', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cream-shim-'));
+    fs.mkdirSync(path.join(dir, 'node_modules', '9router'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'node_modules', '9router', 'cli.js'), '');
+    fs.writeFileSync(path.join(dir, 'fake9r.cmd'), shim);
+    const script = findShimScript('fake9r', [path.join(dir, 'missing'), dir].join(path.delimiter));
+    expect(script).toBe(path.join(dir, 'node_modules', '9router', 'cli.js'));
+    expect(findShimScript('not-installed', dir)).toBeUndefined();
   });
 });
