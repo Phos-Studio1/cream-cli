@@ -6,7 +6,7 @@ import React from 'react';
 import { render } from 'ink';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { App } from '../src/app.js';
-import { defaultConfig } from '../src/lib/config.js';
+import { defaultConfig, loadConfig } from '../src/lib/config.js';
 import { folderKey } from '../src/lib/trust.js';
 import { delta, sleep, sse, startServer } from './helpers.js';
 
@@ -31,6 +31,10 @@ beforeAll(async () => {
     requests.push(json);
     const prompt = json.messages.filter((m: { role: string }) => m.role === 'user').at(-1).content;
     const answered = json.messages.at(-1).role === 'tool';
+    const steps = json.messages.filter((m: { role: string }) => m.role === 'tool').length;
+    if (prompt.includes('long task'))
+      return steps < 35 ? sse(res, toolCall('read_file', { path: `missing-${steps}.txt` })) : sse(res, [delta({ content: 'All 35 steps done.' })]);
+    if (prompt.includes('loop forever')) return sse(res, toolCall('read_file', { path: 'same.txt' }));
     if (prompt.includes('plan'))
       return answered ? sse(res, [delta({ content: 'Got your answers.' })]) : sse(res, toolCall('ask_user', { questions }));
     if (!answered) return sse(res, toolCall('write_file', { path: path.join(workdir, 'note.txt'), content: 'hello' }));
@@ -91,6 +95,47 @@ describe('App', () => {
     expect(requests[0].messages[0].content).toMatch(/^Reply in the language of the latest user message/);
     expect(screen()).toContain('● online');
     app.unmount();
+  });
+
+  it('keeps working past 30 tool steps without asking to continue', async () => {
+    const { app, screen, waitFor, type } = mount();
+    await waitFor('Ask Cream anything');
+    await type('long task');
+    await waitFor('All 35 steps done.');
+    expect(screen()).not.toContain('Send a message to continue');
+    expect(requests.at(-1).messages.filter((m: { role: string }) => m.role === 'tool')).toHaveLength(35);
+    app.unmount();
+  });
+
+  it('stops a model that repeats the same tool call', async () => {
+    const { app, waitFor, type } = mount();
+    await waitFor('Ask Cream anything');
+    const before = requests.length;
+    await type('loop forever');
+    await waitFor('repeated the same tool call 4 times');
+    expect(requests.length - before).toBe(4);
+    app.unmount();
+  });
+
+  it('remembers "always allow" in later sessions', async () => {
+    fs.rmSync(path.join(workdir, 'note.txt'), { force: true });
+    const first = mount();
+    await first.waitFor('Ask Cream anything');
+    await first.type('make a note');
+    await first.waitFor('Write this file?');
+    await first.press('a');
+    await first.waitFor('Done, note.txt created.');
+    first.app.unmount();
+    expect(loadConfig().allowed[folderKey(process.cwd())]).toContain('write_file');
+
+    fs.rmSync(path.join(workdir, 'note.txt'), { force: true });
+    const second = mount({ allowed: loadConfig().allowed });
+    await second.waitFor('Ask Cream anything');
+    await second.type('make a note');
+    await second.waitFor('Done, note.txt created.');
+    expect(second.screen()).not.toContain('Write this file?');
+    expect(fs.readFileSync(path.join(workdir, 'note.txt'), 'utf8')).toBe('hello');
+    second.app.unmount();
   });
 
   it('runs tools without asking in a trusted folder', async () => {

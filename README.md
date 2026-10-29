@@ -83,6 +83,7 @@ If 9Router is installed (`npm install -g 9router`) but not running, Cream starts
 | `/tools` | Toggle tools |
 | `/approve` | Toggle auto-approve |
 | `/trust` | Change whether this folder is trusted |
+| `/permissions [reset]` | Show or reset tools that are always allowed here |
 | `/skills [install\|remove] [owner/repo] [name\|all]` | Manage skills |
 | `/skill <name>` | Pin a skill so it is always active |
 | `/mcp [add\|remove\|on\|off\|restart\|tools]` | Manage MCP servers |
@@ -109,7 +110,7 @@ The first time Cream starts in a folder, it asks whether you trust it:
 
 The choice is saved and applies to subfolders. Change it with `/trust`. Screenshots always ask, even in trusted folders.
 
-Approval prompts accept `y` allow once, `a` always allow that tool for the session, `n` deny and `Esc` stop. `/approve` turns prompts off everywhere; use it with care.
+Approval prompts accept `y` allow once, `a` always allow that tool in this folder (remembered across sessions), `n` deny and `Esc` stop. `/permissions` lists the remembered tools and `/permissions reset` clears them. `/approve` turns prompts off everywhere; use it with care.
 
 When the model needs decisions, it calls `ask_user` with up to four questions. Each appears as a menu: `↑/↓` or a number to choose, `Space` to toggle in multi-select questions, `←/→` to switch questions, and a final **Submit** tab to send every answer at once. Every question also accepts a typed answer.
 

@@ -68,7 +68,7 @@ import {
 } from './lib/context.js';
 import { launchProvider } from './lib/launcher.js';
 import { formatAnswers, type Answers, type Question } from './lib/questions.js';
-import { autoApproves, folderKey, folderTrust } from './lib/trust.js';
+import { allowedTools, allowTool, autoApproves, folderKey, folderTrust } from './lib/trust.js';
 import { directToolLimit, mcp, type McpState } from './lib/mcp.js';
 import {
   deleteAllSessions,
@@ -134,7 +134,7 @@ type Asking = { questions: Question[]; resolve: (answers: Answers | null) => voi
 
 type Props = { initialConfig: Config; initialPrompt?: string; resume?: Session | 'pick'; version: string; migrated?: string[] };
 
-const maxSteps = 30;
+const repeatLimit = 4;
 
 let nextId = 0;
 
@@ -553,7 +553,12 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       };
 
       const key = approvalKey(call);
-      if (needsApproval(call.name, call.args) && !autoApproves(config, call.name) && !allowed.current.has(key)) {
+      if (
+        needsApproval(call.name, call.args) &&
+        !autoApproves(config, call.name) &&
+        !allowed.current.has(key) &&
+        !allowedTools(config.allowed).has(key)
+      ) {
         const preview =
           call.name === 'write_file'
             ? String(call.args.content ?? '')
@@ -562,7 +567,10 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
               : undefined;
         setLive((prev) => (prev ? { ...prev, activity: 'Menunggu persetujuanmu…' } : prev));
         const decision = await askApproval({ name: call.name, detail, preview });
-        if (decision === 'always') allowed.current.add(key);
+        if (decision === 'always') {
+          allowed.current.add(key);
+          updateConfig((prev) => ({ allowed: allowTool(prev.allowed, key) }));
+        }
         if (decision === 'deny' || decision === 'stop') {
           const outcome = { ok: false, output: 'The user denied this action. Ask how they would like to proceed.' };
           record('denied', outcome);
@@ -622,7 +630,7 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       if (call.name === 'remember' || call.name === 'forget') setMemories(loadMemories());
       return dismissed ? { ...outcome, stop: true } : outcome;
     },
-    [config, skills, push, askApproval, hub],
+    [config, skills, push, askApproval, hub, updateConfig],
   );
 
   const generate = useCallback(
@@ -657,7 +665,9 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
       setLive({ content: '', reasoning: '', startedAt });
 
       try {
-        for (let step = 0; step < maxSteps; step++) {
+        let lastRound = '';
+        let repeats = 0;
+        while (true) {
           let latest: StreamState = { content: '', reasoning: '' };
           let lastPaint = 0;
           setLive((prev) => ({ content: '', reasoning: '', startedAt: prev?.startedAt ?? startedAt }));
@@ -764,7 +774,13 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
             lookQueue.current = [];
           }
           if (stopped || controller.signal.aborted) break;
-          if (step === maxSteps - 1) notify('info', `Stopped after ${maxSteps} tool steps. Send a message to continue.`);
+          const round = JSON.stringify(calls.map((call) => [call.function.name, call.function.arguments]));
+          repeats = round === lastRound ? repeats + 1 : 1;
+          lastRound = round;
+          if (repeats >= repeatLimit) {
+            notify('info', `Stopped because the model repeated the same tool call ${repeatLimit} times in a row. Send a message to continue.`);
+            break;
+          }
         }
         if (!controller.signal.aborted) flashMood('happy', 2500);
       } catch (error) {
@@ -1053,6 +1069,19 @@ export function App({ initialConfig, initialPrompt, resume, version, migrated = 
             : notify('info', 'Auto-approve on · the model can write files and run commands without asking');
         case '/trust':
           return setOverlay('trust');
+        case '/permissions': {
+          if (arg === 'reset') {
+            allowed.current.clear();
+            const folder = folderKey(process.cwd());
+            updateConfig((prev) => ({ allowed: Object.fromEntries(Object.entries(prev.allowed).filter(([key]) => key !== folder)) }));
+            return notify('success', 'Always-allowed tools for this folder were reset');
+          }
+          const tools = [...allowedTools(config.allowed)];
+          return notify(
+            'info',
+            tools.length ? `Always allowed here: ${tools.join(', ')}  (/permissions reset to clear)` : 'No tools are always allowed in this folder yet. Press a on an approval to add one.',
+          );
+        }
         case '/system':
           if (!arg) return notify('info', `System prompt: ${config.systemPrompt || '(empty)'}`);
           updateConfig({ systemPrompt: arg === 'none' ? '' : arg });

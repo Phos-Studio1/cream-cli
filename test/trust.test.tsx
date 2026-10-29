@@ -6,7 +6,7 @@ import { render } from 'ink';
 import { describe, expect, it } from 'vitest';
 import { askFolderTrust, TrustPrompt } from '../src/components/TrustPrompt.js';
 import { defaultConfig } from '../src/lib/config.js';
-import { autoApproves, folderKey, folderTrust, type TrustChoice } from '../src/lib/trust.js';
+import { allowedTools, allowTool, autoApproves, folderKey, folderTrust, type TrustChoice } from '../src/lib/trust.js';
 import { sleep } from './helpers.js';
 
 const project = path.join(os.tmpdir(), 'Cream-Trust', 'project');
@@ -77,5 +77,16 @@ describe('askFolderTrust', () => {
     stdin.write('2');
     await expect(pending).resolves.toBe('ask');
     expect(stdin.listenerCount('readable')).toBe(0);
+  });
+});
+
+describe('always-allowed tools', () => {
+  it('remembers tools per folder and applies them to subfolders', () => {
+    let allowed = allowTool({}, 'run_command', project);
+    allowed = allowTool(allowed, 'run_command', project);
+    allowed = allowTool(allowed, 'mcp:rea/list_strings', path.join(project, 'sub'));
+    expect(allowed[folderKey(project)]).toEqual(['run_command']);
+    expect([...allowedTools(allowed, path.join(project, 'sub', 'deep'))].sort()).toEqual(['mcp:rea/list_strings', 'run_command']);
+    expect(allowedTools(allowed, path.dirname(project)).size).toBe(0);
   });
 });

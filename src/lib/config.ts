@@ -22,6 +22,7 @@ export type Config = {
   mascot: boolean;
   mcpServers: Record<string, McpServerConfig>;
   folders: Record<string, FolderTrust>;
+  allowed: Record<string, string[]>;
 };
 
 export type FolderTrust = 'trust' | 'ask';
@@ -62,6 +63,7 @@ export const defaultConfig: Config = {
   mascot: true,
   mcpServers: {},
   folders: {},
+  allowed: {},
 };
 
 const freshRemote = (raw?: Partial<RemoteConfig>): RemoteConfig => ({
@@ -98,6 +100,11 @@ function migrate(raw: Record<string, any>): Config {
     apiKeys: { ...raw.apiKeys },
     remote: freshRemote(raw.remote),
     mcpServers: { ...raw.mcpServers },
+    allowed: Object.fromEntries(
+      Object.entries(raw.allowed ?? {})
+        .filter(([, tools]) => Array.isArray(tools))
+        .map(([folder, tools]) => [folder, (tools as unknown[]).filter((tool): tool is string => typeof tool === 'string')]),
+    ),
     folders: Object.fromEntries(Object.entries(raw.folders ?? {}).filter(([, value]) => value === 'trust' || value === 'ask')) as Record<string, FolderTrust>,
   };
   if (legacyPrompts.includes(raw.systemPrompt)) config.systemPrompt = defaultConfig.systemPrompt;

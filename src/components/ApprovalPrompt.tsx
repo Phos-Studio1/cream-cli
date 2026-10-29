@@ -48,7 +48,7 @@ export function ApprovalPrompt({ request, onDecision }: Props) {
         <Text color={theme.mint} bold>y</Text>
         <Text color={theme.muted}> allow · </Text>
         <Text color={theme.mint} bold>a</Text>
-        <Text color={theme.muted}> always allow {request.name} · </Text>
+        <Text color={theme.muted}> always allow {request.name} here · </Text>
         <Text color={theme.strawberry} bold>n</Text>
         <Text color={theme.muted}> deny · </Text>
         <Text color={theme.strawberry} bold>esc</Text>

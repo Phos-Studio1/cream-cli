@@ -12,6 +12,7 @@ export const commands: Command[] = [
   { name: '/tools', description: 'Toggle tools (files, commands, skills)' },
   { name: '/approve', description: 'Toggle auto-approve for file writes and commands' },
   { name: '/trust', description: 'Change whether this folder is trusted' },
+  { name: '/permissions', description: 'Show or reset tools that are always allowed in this folder' },
   { name: '/system', args: '[prompt]', description: 'Show or set the system prompt' },
   { name: '/temp', args: '<0-2>', description: 'Set the temperature' },
   { name: '/think', description: 'Show or hide model reasoning' },
