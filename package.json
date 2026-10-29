@@ -1,6 +1,6 @@
 {
   "name": "creamcli",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "description": "Terminal AI assistant for local and cloud LLMs, with tools, skills, MCP and remote control.",
   "type": "module",
   "bin": {
